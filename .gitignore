@@ -1,0 +1,7 @@
+supabase-config.js
+.env
+.env.*
+!.env.example
+/dataset_for_billing.csv
+/index backup .html
+/site/

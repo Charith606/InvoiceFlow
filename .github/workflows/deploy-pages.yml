@@ -1,0 +1,92 @@
+name: Deploy InvoiceFlow to GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Create a clean Pages artifact
+        env:
+          INVOICEFLOW_SUPABASE_URL: ${{ vars.INVOICEFLOW_SUPABASE_URL }}
+          INVOICEFLOW_SUPABASE_PUBLISHABLE_KEY: ${{ vars.INVOICEFLOW_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const url = process.env.INVOICEFLOW_SUPABASE_URL;
+          const publishableKey = process.env.INVOICEFLOW_SUPABASE_PUBLISHABLE_KEY;
+          if (!url || !publishableKey) {
+            throw new Error('Set the INVOICEFLOW_SUPABASE_URL and INVOICEFLOW_SUPABASE_PUBLISHABLE_KEY repository variables before dispatching this workflow.');
+          }
+
+          let supabaseUrl;
+          try {
+            supabaseUrl = new URL(url);
+          } catch {
+            throw new Error('INVOICEFLOW_SUPABASE_URL must be a valid HTTPS Supabase project URL.');
+          }
+          if (
+            supabaseUrl.protocol !== 'https:' ||
+            !supabaseUrl.hostname.endsWith('.supabase.co') ||
+            supabaseUrl.username ||
+            supabaseUrl.password
+          ) {
+            throw new Error('INVOICEFLOW_SUPABASE_URL must use HTTPS and a hostname ending in .supabase.co.');
+          }
+
+          if (/(sb_secret_|service[_-]?role|eyJ)/i.test(publishableKey)) {
+            throw new Error('A secret or service-role key was supplied. Use only a Supabase publishable key.');
+          }
+          if (!publishableKey.startsWith('sb_publishable_')) {
+            throw new Error('INVOICEFLOW_SUPABASE_PUBLISHABLE_KEY must start with sb_publishable_.');
+          }
+
+          const source = fs.readFileSync('index.html', 'utf8');
+          const configTag = '<script src="supabase-config.js"></script>';
+          if (source.split(configTag).length !== 2) {
+            throw new Error('Expected exactly one local Supabase config script tag in index.html.');
+          }
+
+          const config = JSON.stringify({ url, publishableKey }).replace(/</g, '\\u003c');
+          const deployedHtml = source.replace(
+            configTag,
+            `<script>window.INVOICEFLOW_SUPABASE = ${config};</script>`
+          );
+          fs.mkdirSync('site', { recursive: true });
+          fs.writeFileSync(path.join('site', 'index.html'), deployedHtml, 'utf8');
+          NODE
+
+      - name: Set up GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the allowlisted site files
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy Pages artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
