@@ -1,3 +1,4 @@
+
 # InvoiceFlow prototype
 
 InvoiceFlow is a no-build HTML/CSS/JavaScript application. It requires a user's own Supabase Auth account before opening the workspace. It uses Supabase for invoices, suppliers, settlements, and cash-flow settings. Demo records are not copied into accounts; no demo account is provided.
@@ -44,3 +45,4 @@ The supplied CSV and seeded invoices are synthetic demo data. They are only sour
 ## Dependencies and verification
 
 There is no package manager or build step. Tesseract.js 5.1.1 and Supabase JS v2 are loaded from CDNs at runtime. Camera, OCR accuracy, cloud persistence, and cross-account RLS behavior still require browser/device tests with a configured Supabase project. Run the SQL once in a new project; this initial setup script creates policies.
+# InvoiceFlow
